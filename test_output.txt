@@ -1,0 +1,66 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.9.13, pytest-7.1.2, pluggy-1.0.0 -- C:\Anoconda\python.exe
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: C:\Users\HP\Desktop\cycle_sync
+plugins: anyio-4.12.1, hypothesis-6.141.1
+collecting ... collected 35 items
+
+lambdas/auth/tests/test_profile_handlers.py::TestGetProfile::test_returns_profile_for_authenticated_user PASSED [  2%]
+lambdas/auth/tests/test_profile_handlers.py::TestGetProfile::test_returns_401_when_no_auth_context PASSED [  5%]
+lambdas/auth/tests/test_profile_handlers.py::TestGetProfile::test_returns_404_when_profile_not_found PASSED [  8%]
+lambdas/auth/tests/test_profile_handlers.py::TestPutProfile::test_updates_display_name PASSED [ 11%]
+lambdas/auth/tests/test_profile_handlers.py::TestPutProfile::test_updates_language_preference PASSED [ 14%]
+lambdas/auth/tests/test_profile_handlers.py::TestPutProfile::test_accepts_cycle_length_at_lower_boundary PASSED [ 17%]
+lambdas/auth/tests/test_profile_handlers.py::TestPutProfile::test_accepts_cycle_length_at_upper_boundary PASSED [ 20%]
+lambdas/auth/tests/test_profile_handlers.py::TestPutProfile::test_rejects_cycle_length_below_21 PASSED [ 22%]
+lambdas/auth/tests/test_profile_handlers.py::TestPutProfile::test_rejects_cycle_length_above_45 PASSED [ 25%]
+lambdas/auth/tests/test_profile_handlers.py::TestPutProfile::test_rejects_non_numeric_cycle_length PASSED [ 28%]
+lambdas/auth/tests/test_profile_handlers.py::TestPutProfile::test_rejects_empty_body PASSED [ 31%]
+lambdas/auth/tests/test_profile_handlers.py::TestPutProfile::test_ignores_non_updatable_fields PASSED [ 34%]
+lambdas/auth/tests/test_profile_handlers.py::TestPutProfile::test_returns_401_when_no_auth_context PASSED [ 37%]
+lambdas/auth/tests/test_profile_handlers.py::TestPutProfile::test_updates_multiple_fields_at_once PASSED [ 40%]
+lambdas/auth/tests/test_profile_handlers.py::TestPutHobbies::test_updates_valid_hobby_subset PASSED [ 42%]
+lambdas/auth/tests/test_profile_handlers.py::TestPutHobbies::test_updates_all_four_hobbies PASSED [ 45%]
+lambdas/auth/tests/test_profile_handlers.py::TestPutHobbies::test_defaults_to_all_four_when_empty_list PASSED [ 48%]
+lambdas/auth/tests/test_profile_handlers.py::TestPutHobbies::test_defaults_to_all_four_when_key_missing PASSED [ 51%]
+lambdas/auth/tests/test_profile_handlers.py::TestPutHobbies::test_rejects_invalid_hobby PASSED [ 54%]
+lambdas/auth/tests/test_profile_handlers.py::TestPutHobbies::test_rejects_completely_invalid_list PASSED [ 57%]
+lambdas/auth/tests/test_profile_handlers.py::TestPutHobbies::test_returns_401_when_no_auth_context PASSED [ 60%]
+lambdas/auth/tests/test_profile_handlers.py::TestPutHobbies::test_updates_updated_at_timestamp PASSED [ 62%]
+lambdas/auth/tests/test_property_cycle_length_validation.py::test_invalid_cycle_length_returns_400 PASSED [ 65%]
+lambdas/auth/tests/test_property_cycle_length_validation.py::test_valid_cycle_length_returns_200 PASSED [ 68%]
+lambdas/auth/tests/test_property_hobby_persistence.py::test_hobby_preferences_roundtrip PASSED [ 71%]
+lambdas/auth/tests/test_property_hobby_persistence.py::test_language_preference_roundtrip PASSED [ 74%]
+lambdas/auth/tests/test_property_login_roundtrip.py::test_login_roundtrip PASSED [ 77%]
+lambdas/auth/tests/test_property_logout_invalidates_session.py::test_logout_invalidates_session PASSED [ 80%]
+lambdas/auth/tests/test_property_password_hashing.py::test_password_not_stored_in_plaintext PASSED [ 82%]
+lambdas/auth/tests/test_property_password_length.py::test_short_password_is_rejected PASSED [ 85%]
+lambdas/auth/tests/test_property_password_length.py::test_valid_length_password_not_rejected_for_length PASSED [ 88%]
+lambdas/auth/tests/test_property_profile_update_roundtrip.py::test_profile_update_roundtrip PASSED [ 91%]
+lambdas/auth/tests/test_property_registration_roundtrip.py::test_registration_roundtrip FAILED [ 94%]
+lambdas/auth/tests/test_property_registration_validation.py::test_registration_rejects_missing_required_fields PASSED [ 97%]
+lambdas/auth/tests/test_property_session_expiry.py::test_session_expiry_configuration PASSED [100%]
+
+================================== FAILURES ===================================
+_________________________ test_registration_roundtrip _________________________
+lambdas\auth\tests\test_property_registration_roundtrip.py:157: in test_registration_roundtrip
+    @given(
+lambdas\auth\tests\test_property_registration_roundtrip.py:200: in test_registration_roundtrip
+    assert response["statusCode"] in (200, 201), (
+E   AssertionError: Expected 200 or 201 for valid payload, got 500. Body: {"error": "internal_error", "message": "Registration failed"}
+E   assert 500 in (200, 201)
+E   Falsifying example: test_registration_roundtrip(
+E       email='O@A.HR',
+E       password='00000000',
+E       display_name='0',
+E       age=18,
+E       last_period_date='2023-01-01',
+E       cycle_length_days=21,
+E   )
+------------------------------ Captured log call ------------------------------
+ERROR    handler:handler.py:211 email check error: An error occurred (ResourceNotFoundException) when calling the Query operation: Invalid index: email-index for table: cyclesync-users. Available indexes are: 
+ERROR    handler:handler.py:211 email check error: An error occurred (ResourceNotFoundException) when calling the Query operation: Invalid index: email-index for table: cyclesync-users. Available indexes are:
+=========================== short test summary info ===========================
+FAILED lambdas/auth/tests/test_property_registration_roundtrip.py::test_registration_roundtrip
+=================== 1 failed, 34 passed in 67.77s (0:01:07) ===================

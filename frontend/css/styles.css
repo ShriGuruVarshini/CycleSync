@@ -1,0 +1,389 @@
+/* CycleSync — responsive stylesheet (320px – 1920px) */
+
+/* ── Reset & base ─────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --color-primary: #c2185b;
+  --color-primary-light: #f48fb1;
+  --color-bg: #fce4ec;
+  --color-surface: #ffffff;
+  --color-text: #212121;
+  --color-muted: #757575;
+  --color-error: #d32f2f;
+  --color-info: #1565c0;
+  --radius: 8px;
+  --shadow: 0 2px 8px rgba(0,0,0,.12);
+  --max-width: 480px;
+}
+
+html { font-size: 16px; }
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+  min-height: 100vh;
+}
+
+/* ── Utility ──────────────────────────────────────────────────────────── */
+.hidden { display: none !important; }
+.error  { color: var(--color-error); font-size: .875rem; margin-top: .25rem; }
+.info   { color: var(--color-info);  font-size: .875rem; margin-top: .25rem; }
+.loading { color: var(--color-muted); text-align: center; padding: 2rem; }
+
+/* ── Views ────────────────────────────────────────────────────────────── */
+.view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.5rem 1rem;
+  min-height: 100vh;
+}
+
+/* ── Auth forms ───────────────────────────────────────────────────────── */
+form {
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 2rem;
+  width: 100%;
+  max-width: var(--max-width);
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+}
+
+h1 {
+  font-size: 1.75rem;
+  color: var(--color-primary);
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+h2 { font-size: 1.4rem; color: var(--color-primary); margin-bottom: 1rem; }
+h3 { font-size: 1.1rem; color: var(--color-primary); margin: 1.5rem 0 .5rem; }
+
+label {
+  font-size: .875rem;
+  font-weight: 600;
+  color: var(--color-muted);
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+input[type="date"],
+select,
+textarea {
+  width: 100%;
+  padding: .6rem .75rem;
+  border: 1px solid #e0e0e0;
+  border-radius: var(--radius);
+  font-size: 1rem;
+  transition: border-color .2s;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+button[type="submit"] {
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  padding: .75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .2s;
+  margin-top: .5rem;
+}
+
+button[type="submit"]:hover { background: #ad1457; }
+
+a { color: var(--color-primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Navigation ───────────────────────────────────────────────────────── */
+nav {
+  width: 100%;
+  background: var(--color-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: .75rem 1.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.nav-brand { font-weight: 700; font-size: 1.1rem; flex: 1; }
+nav a { color: #fff; font-size: .9rem; }
+
+/* ── Dashboard ────────────────────────────────────────────────────────── */
+#dashboard-content {
+  width: 100%;
+  max-width: 900px;
+  margin: 1.5rem auto;
+  padding: 0 1rem;
+}
+
+.phase-card {
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.phase-card h2 { margin-bottom: .5rem; }
+.phase-message { color: var(--color-muted); font-size: .95rem; }
+.support-message {
+  background: var(--color-primary-light);
+  border-radius: var(--radius);
+  padding: .75rem 1rem;
+  margin-top: .75rem;
+  font-size: .95rem;
+}
+
+.mood-display {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.mood-badge {
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1rem 1.5rem;
+  flex: 1;
+  min-width: 140px;
+  text-align: center;
+}
+
+.mood-badge .label { font-size: .75rem; color: var(--color-muted); }
+.mood-badge .value { font-size: 1.25rem; font-weight: 700; }
+.mood-badge.predicted .value { color: var(--color-muted); }
+.mood-badge.logged .value    { color: var(--color-primary); }
+
+.recommendations { margin-bottom: 2rem; }
+.recommendations h3 { margin-bottom: .75rem; }
+
+.rec-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.rec-card {
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1rem;
+}
+
+.rec-card .rec-title { font-weight: 700; margin-bottom: .25rem; }
+.rec-card .rec-category {
+  font-size: .75rem;
+  color: #fff;
+  background: var(--color-primary);
+  border-radius: 4px;
+  padding: .1rem .4rem;
+  display: inline-block;
+  margin-bottom: .5rem;
+}
+.rec-card .rec-desc { font-size: .875rem; color: var(--color-muted); }
+
+/* ── Mood options ─────────────────────────────────────────────────────── */
+.mood-options {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.mood-options label {
+  font-size: 1rem;
+  font-weight: 400;
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  cursor: pointer;
+}
+
+/* ── Mood history ─────────────────────────────────────────────────────── */
+#mood-history { display: flex; flex-direction: column; gap: .75rem; margin-top: .5rem; }
+
+.mood-entry {
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: .75rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.mood-entry .entry-date { font-size: .8rem; color: var(--color-muted); }
+.mood-entry .entry-mood { font-weight: 700; }
+.mood-entry .entry-note { font-size: .875rem; color: var(--color-muted); flex: 1; }
+
+/* ── Responsive breakpoints ───────────────────────────────────────────── */
+@media (max-width: 480px) {
+  form { padding: 1.25rem; }
+  .rec-grid { grid-template-columns: 1fr; }
+  .mood-display { flex-direction: column; }
+}
+
+@media (min-width: 768px) {
+  .view { padding: 2rem; }
+  #dashboard-content { padding: 0 2rem; }
+}
+
+@media (min-width: 1280px) {
+  #dashboard-content { max-width: 1100px; }
+}
+
+@media (min-width: 1920px) {
+  html { font-size: 18px; }
+  #dashboard-content { max-width: 1400px; }
+}
+
+/* ── Nudge card ───────────────────────────────────────────────────────────── */
+.nudge-card {
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.nudge-emoji {
+  font-size: 2.5rem;
+  margin-bottom: .5rem;
+}
+
+.nudge-line {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  margin-bottom: .25rem;
+}
+
+.nudge-cta {
+  font-size: .95rem;
+  color: var(--color-muted);
+  margin-bottom: 1.25rem;
+}
+
+/* ── Hobby pills ──────────────────────────────────────────────────────────── */
+.hobby-list {
+  display: flex;
+  flex-direction: column;
+  gap: .6rem;
+  text-align: left;
+}
+
+.hobby-pill {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  background: var(--color-bg);
+  border: 2px solid var(--color-primary-light);
+  border-radius: 999px;
+  padding: .6rem 1.2rem;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: .95rem;
+  transition: background .2s, transform .15s;
+  user-select: none;
+}
+
+.hobby-pill:hover {
+  background: var(--color-primary-light);
+  transform: scale(1.02);
+}
+
+.hobby-icon { font-size: 1.2rem; }
+.hobby-name { flex: 1; }
+.hobby-arrow { font-size: .8rem; color: var(--color-muted); }
+
+/* ── Hobby items (expandable) ─────────────────────────────────────────────── */
+.hobby-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+  padding: .5rem .5rem 1rem 1rem;
+}
+
+.hobby-empty {
+  color: var(--color-muted);
+  font-size: .875rem;
+  padding: .5rem;
+}
+
+/* Pop-in animation when hobby items expand */
+@keyframes hobbyPop {
+  0%   { opacity: 0; transform: translateY(-8px) scale(.97); }
+  60%  { transform: translateY(2px) scale(1.01); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.hobby-pop {
+  animation: hobbyPop .35s ease forwards;
+}
+
+/* Staggered pill entrance on dashboard load */
+.hobby-pill {
+  opacity: 0;
+  animation: hobbyPop .4s ease forwards;
+}
+
+/* ── Mood-specific badge colors ───────────────────────────────────────────── */
+.mood-badge.mood-sad   .value { color: #5c6bc0; }
+.mood-badge.mood-angry .value { color: #e53935; }
+.mood-badge.mood-happy .value { color: #43a047; }
+
+/* ── Nudge highlight for Sad/Angry active mood ────────────────────────────── */
+.nudge-highlight {
+  border: 2px solid var(--color-primary-light);
+  background: linear-gradient(135deg, #fff0f5 0%, #fff 100%);
+}
+
+.nudge-highlight .nudge-line {
+  font-size: 1.15rem;
+}
+
+/* ── Auth brand block (login / register) ─────────────────────────────────── */
+.auth-brand {
+  text-align: center;
+  max-width: var(--max-width);
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+.auth-brand h1 {
+  font-size: 2rem;
+  margin-bottom: .35rem;
+}
+
+.auth-tagline {
+  font-size: 1rem;
+  font-style: italic;
+  color: var(--color-primary);
+  margin-bottom: .4rem;
+  font-weight: 500;
+}
+
+.auth-desc {
+  font-size: .875rem;
+  color: var(--color-muted);
+  line-height: 1.5;
+}

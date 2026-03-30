@@ -1,0 +1,4 @@
+boto3
+hypothesis
+moto[dynamodb,cognitoidp]
+pytest

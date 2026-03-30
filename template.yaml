@@ -1,0 +1,610 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: CycleSync — Lambda + DynamoDB only (no API Gateway, no SSM)
+
+# ── Global defaults ────────────────────────────────────────────────────────
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 30
+    MemorySize: 256
+    Tracing: Active
+    Layers:
+      - !Ref CommonLayer
+    Environment:
+      Variables:
+        USERS_TABLE: !Ref UsersTable
+        SESSIONS_TABLE: !Ref SessionsTable
+        MOOD_TABLE: !Ref MoodEntriesTable
+        CONTENT_TABLE: !Ref ContentItemsTable
+        NOTIF_LOG_TABLE: !Ref NotificationLogsTable
+        CONFIG_TABLE: !Ref ConfigTable   # stores JWT secret + app config
+
+# ── Parameters ─────────────────────────────────────────────────────────────
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+
+# ── Resources ──────────────────────────────────────────────────────────────
+Resources:
+
+  # ── DynamoDB Tables ───────────────────────────────────────────────────────
+
+  # Stores JWT secret and any app-level config (replaces SSM/Secrets Manager)
+  ConfigTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "cyclesync-config-${Environment}"
+      BillingMode: PAY_PER_REQUEST
+      SSESpecification:
+        SSEEnabled: true
+      AttributeDefinitions:
+        - AttributeName: config_key
+          AttributeType: S
+      KeySchema:
+        - AttributeName: config_key
+          KeyType: HASH
+
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "cyclesync-users-${Environment}"
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+        - AttributeName: email
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: email-index
+          KeySchema:
+            - AttributeName: email
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  # JWT token store — TTL auto-expires sessions after 30 min
+  SessionsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "cyclesync-sessions-${Environment}"
+      BillingMode: PAY_PER_REQUEST
+      SSESpecification:
+        SSEEnabled: true
+      AttributeDefinitions:
+        - AttributeName: token
+          AttributeType: S
+      KeySchema:
+        - AttributeName: token
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  MoodEntriesTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "cyclesync-mood-entries-${Environment}"
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+        - AttributeName: entry_date
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH
+        - AttributeName: entry_date
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  ContentItemsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "cyclesync-content-items-${Environment}"
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      AttributeDefinitions:
+        - AttributeName: item_id
+          AttributeType: S
+        - AttributeName: category
+          AttributeType: S
+        - AttributeName: mood_tags
+          AttributeType: S
+        - AttributeName: language
+          AttributeType: S
+      KeySchema:
+        - AttributeName: item_id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: category-index
+          KeySchema:
+            - AttributeName: category
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: mood-tags-index
+          KeySchema:
+            - AttributeName: mood_tags
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: language-index
+          KeySchema:
+            - AttributeName: language
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  NotificationLogsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub "cyclesync-notification-logs-${Environment}"
+      BillingMode: PAY_PER_REQUEST
+      SSESpecification:
+        SSEEnabled: true
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+        - AttributeName: sent_at
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH
+        - AttributeName: sent_at
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  # ── IAM — shared base policy ──────────────────────────────────────────────
+  LambdaBasePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "cyclesync-lambda-base-${Environment}"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: "arn:aws:logs:*:*:*"
+          - Effect: Allow
+            Action:
+              - xray:PutTraceSegments
+              - xray:PutTelemetryRecords
+            Resource: "*"
+          # All Lambdas can read config (JWT secret) from ConfigTable
+          - Effect: Allow
+            Action:
+              - dynamodb:GetItem
+            Resource: !GetAtt ConfigTable.Arn
+
+  # ── IAM Roles ─────────────────────────────────────────────────────────────
+
+  AuthRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "cyclesync-auth-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref LambdaBasePolicy
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:Query
+                Resource:
+                  - !GetAtt UsersTable.Arn
+                  - !Sub "${UsersTable.Arn}/index/*"
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:DeleteItem
+                Resource: !GetAtt SessionsTable.Arn
+
+  ProfileRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "cyclesync-profile-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref LambdaBasePolicy
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:UpdateItem
+                Resource:
+                  - !GetAtt UsersTable.Arn
+                  - !Sub "${UsersTable.Arn}/index/*"
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                Resource: !GetAtt SessionsTable.Arn
+
+  CycleTrackerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "cyclesync-cycle-tracker-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref LambdaBasePolicy
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                Resource:
+                  - !GetAtt UsersTable.Arn
+                  - !GetAtt SessionsTable.Arn
+
+  MoodTrackerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "cyclesync-mood-tracker-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref LambdaBasePolicy
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:Query
+                Resource: !GetAtt MoodEntriesTable.Arn
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                Resource: !GetAtt SessionsTable.Arn
+
+  PredictionEngineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "cyclesync-prediction-engine-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref LambdaBasePolicy
+      # Pure function — no DynamoDB access needed
+
+  RecommendationEngineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "cyclesync-recommendation-engine-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref LambdaBasePolicy
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource:
+                  - !GetAtt ContentItemsTable.Arn
+                  - !Sub "${ContentItemsTable.Arn}/index/*"
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                Resource: !GetAtt SessionsTable.Arn
+
+  NotificationServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "cyclesync-notification-service-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref LambdaBasePolicy
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:Scan
+                  - dynamodb:GetItem
+                  - dynamodb:UpdateItem
+                Resource: !GetAtt UsersTable.Arn
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:Query
+                Resource: !GetAtt NotificationLogsTable.Arn
+
+  DashboardRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "cyclesync-dashboard-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref LambdaBasePolicy
+      Policies:
+        - PolicyName: InvokeLambdasAndDynamoDB
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource:
+                  - !GetAtt CycleTrackerFunction.Arn
+                  - !GetAtt MoodTrackerFunction.Arn
+                  - !GetAtt PredictionEngineFunction.Arn
+                  - !GetAtt RecommendationEngineFunction.Arn
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                Resource:
+                  - !GetAtt SessionsTable.Arn
+                  - !GetAtt UsersTable.Arn
+
+  # ── Lambda Layer ──────────────────────────────────────────────────────────
+  CommonLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub "cyclesync-common-${Environment}"
+      Description: Shared utilities — auth middleware, DynamoDB client, token helpers
+      ContentUri: layers/common/
+      CompatibleRuntimes:
+        - python3.12
+      RetentionPolicy: Retain
+
+  # ── Lambda Functions ──────────────────────────────────────────────────────
+  # All functions use Lambda Function URLs (HTTPS endpoint built into Lambda)
+  # instead of API Gateway — free, no extra service needed.
+
+  AuthFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "cyclesync-auth-${Environment}"
+      CodeUri: lambdas/auth/
+      Handler: handler.lambda_handler
+      Role: !GetAtt AuthRole.Arn
+      FunctionUrlConfig:
+        AuthType: NONE   # auth handled inside Lambda via token validation
+        Cors:
+          AllowOrigins: ["*"]
+          AllowMethods: ["POST"]
+          AllowHeaders: ["Content-Type", "Authorization"]
+
+  ProfileFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "cyclesync-profile-${Environment}"
+      CodeUri: lambdas/auth/
+      Handler: handler.lambda_handler
+      Role: !GetAtt ProfileRole.Arn
+      FunctionUrlConfig:
+        AuthType: NONE
+        Cors:
+          AllowOrigins: ["*"]
+          AllowMethods: ["GET", "PUT"]
+          AllowHeaders: ["Content-Type", "Authorization"]
+
+  CycleTrackerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "cyclesync-cycle-tracker-${Environment}"
+      CodeUri: lambdas/cycle_tracker/
+      Handler: handler.lambda_handler
+      Role: !GetAtt CycleTrackerRole.Arn
+      FunctionUrlConfig:
+        AuthType: NONE
+        Cors:
+          AllowOrigins: ["*"]
+          AllowMethods: ["GET"]
+          AllowHeaders: ["Content-Type", "Authorization"]
+
+  MoodTrackerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "cyclesync-mood-tracker-${Environment}"
+      CodeUri: lambdas/mood_tracker/
+      Handler: handler.lambda_handler
+      Role: !GetAtt MoodTrackerRole.Arn
+      FunctionUrlConfig:
+        AuthType: NONE
+        Cors:
+          AllowOrigins: ["*"]
+          AllowMethods: ["GET", "POST"]
+          AllowHeaders: ["Content-Type", "Authorization"]
+
+  PredictionEngineFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "cyclesync-prediction-engine-${Environment}"
+      CodeUri: lambdas/prediction_engine/
+      Handler: handler.lambda_handler
+      Role: !GetAtt PredictionEngineRole.Arn
+      # No FunctionUrlConfig — invoked directly by DashboardFunction only
+
+  RecommendationEngineFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "cyclesync-recommendation-engine-${Environment}"
+      CodeUri: lambdas/recommendation_engine/
+      Handler: handler.lambda_handler
+      Role: !GetAtt RecommendationEngineRole.Arn
+      FunctionUrlConfig:
+        AuthType: NONE
+        Cors:
+          AllowOrigins: ["*"]
+          AllowMethods: ["GET", "POST", "PUT", "DELETE"]
+          AllowHeaders: ["Content-Type", "Authorization"]
+
+  NotificationServiceFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "cyclesync-notification-service-${Environment}"
+      CodeUri: lambdas/notification_service/
+      Handler: handler.lambda_handler
+      Role: !GetAtt NotificationServiceRole.Arn
+      # Triggered by EventBridge schedule — no Function URL needed
+      Events:
+        MorningSchedule:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: "cron(0 8 * * ? *)"
+            Description: Morning notification slot (08:00 UTC)
+        AfternoonSchedule:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: "cron(0 13 * * ? *)"
+            Description: Afternoon notification slot (13:00 UTC)
+        EveningSchedule:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: "cron(0 20 * * ? *)"
+            Description: Evening notification slot (20:00 UTC)
+
+  DashboardFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "cyclesync-dashboard-${Environment}"
+      CodeUri: lambdas/dashboard/
+      Handler: handler.lambda_handler
+      Role: !GetAtt DashboardRole.Arn
+      MemorySize: 512
+      FunctionUrlConfig:
+        AuthType: NONE
+        Cors:
+          AllowOrigins: ["*"]
+          AllowMethods: ["GET"]
+          AllowHeaders: ["Content-Type", "Authorization"]
+
+# ── Outputs ────────────────────────────────────────────────────────────────
+Outputs:
+  ConfigTableName:
+    Description: DynamoDB config table (stores JWT secret)
+    Value: !Ref ConfigTable
+
+  UsersTableName:
+    Description: DynamoDB users table
+    Value: !Ref UsersTable
+
+  SessionsTableName:
+    Description: DynamoDB sessions table
+    Value: !Ref SessionsTable
+
+  MoodEntriesTableName:
+    Description: DynamoDB mood entries table
+    Value: !Ref MoodEntriesTable
+
+  ContentItemsTableName:
+    Description: DynamoDB content items table
+    Value: !Ref ContentItemsTable
+
+  AuthFunctionArn:
+    Description: Auth Lambda ARN
+    Value: !GetAtt AuthFunction.Arn
+
+  DashboardFunctionArn:
+    Description: Dashboard Lambda ARN
+    Value: !GetAtt DashboardFunction.Arn

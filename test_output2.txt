@@ -1,0 +1,23 @@
+﻿................................F..                                      [100%]
+================================== FAILURES ===================================
+_________________________ test_registration_roundtrip _________________________
+lambdas\auth\tests\test_property_registration_roundtrip.py:157: in test_registration_roundtrip
+    @given(
+lambdas\auth\tests\test_property_registration_roundtrip.py:200: in test_registration_roundtrip
+    assert response["statusCode"] in (200, 201), (
+E   AssertionError: Expected 200 or 201 for valid payload, got 500. Body: {"error": "internal_error", "message": "Registration failed"}
+E   assert 500 in (200, 201)
+E   Falsifying example: test_registration_roundtrip(
+E       email='O@A.HR',
+E       password='00000000',
+E       display_name='0',
+E       age=18,
+E       last_period_date='2023-01-01',
+E       cycle_length_days=21,
+E   )
+------------------------------ Captured log call ------------------------------
+ERROR    handler:handler.py:211 email check error: An error occurred (ResourceNotFoundException) when calling the Query operation: Invalid index: email-index for table: cyclesync-users. Available indexes are: 
+ERROR    handler:handler.py:211 email check error: An error occurred (ResourceNotFoundException) when calling the Query operation: Invalid index: email-index for table: cyclesync-users. Available indexes are:
+=========================== short test summary info ===========================
+FAILED lambdas/auth/tests/test_property_registration_roundtrip.py::test_registration_roundtrip
+1 failed, 34 passed in 66.74s (0:01:06)

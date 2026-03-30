@@ -1,0 +1,21 @@
+# Normalize line endings for all text files
+* text=auto
+
+# Python files — keep LF
+*.py text eol=lf
+
+# JS/CSS/HTML — keep LF
+*.js text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+
+# Markdown and config
+*.md text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+*.txt text eol=lf
+
+# Windows batch files — keep CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
